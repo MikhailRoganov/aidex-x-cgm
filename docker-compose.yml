@@ -1,0 +1,61 @@
+services:
+
+  # ── MongoDB (Nightscout database) ──────────────────────────────────────────
+  mongo:
+    image: mongo:4.4
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - cgm-net
+
+  # ── Nightscout ─────────────────────────────────────────────────────────────
+  nightscout:
+    image: nightscout/cgm-remote-monitor:latest
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/nightscout
+      API_SECRET: ${NIGHTSCOUT_API_SECRET}
+      DISPLAY_UNITS: mg/dl
+      ENABLE: "careportal rawbg iob maker cors"
+      NIGHT_MODE: "off"
+      SHOW_RAWBG: never
+      TIME_FORMAT: 24
+      BASE_URL: http://localhost:1337
+      INSECURE_USE_HTTP: "true"
+      # Auth is enforced; the CGM scheduler uses api-secret header.
+      AUTH_DEFAULT_ROLES: denied
+    ports:
+      - "1337:1337"
+    networks:
+      - cgm-net
+
+  # ── CGM Scheduler ──────────────────────────────────────────────────────────
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - nightscout
+    environment:
+      AIDEX_API_URL:   https://gateway.pancares.com/backend/aidex-x/cgmRecord/getCgmRecordsByPageInfo
+      AIDEX_USER_ID:   ${AIDEX_USER_ID}
+      AIDEX_TOKEN:     ${AIDEX_TOKEN}
+      AIDEX_BRAND:     linX
+      AIDEX_APP_INFO:  com.microtechmd.AiDEX-X.eu.mmol
+      AIDEX_USER_AGENT: "EU_mmol/2.4.1 (com.microtechmd.AiDEX-X.eu.mmol; build:26032001; iOS 26.4.0) Alamofire/5.6.4"
+      NIGHTSCOUT_URL:        http://nightscout:1337
+      NIGHTSCOUT_API_SECRET: ${NIGHTSCOUT_API_SECRET}
+      POLL_INTERVAL:   ${POLL_INTERVAL:-1m}
+    networks:
+      - cgm-net
+
+networks:
+  cgm-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
