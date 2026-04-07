@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/brkss/aidex-x-cgm/internal/domain"
@@ -61,6 +62,12 @@ func (s *SyncService) Sync(ctx context.Context) error {
 		log.Println("[sync] no new CGM records found")
 		return nil
 	}
+
+	// 2.1 Sort records chronologically (ASC). 
+	// AiDEX returns newest first (DESC), but we process them oldest first.
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].AppTime.Before(records[j].AppTime)
+	})
 
 	// 3. Convert and filter to only records strictly after the last Nightscout entry.
 	var entries []domain.NightscoutEntry

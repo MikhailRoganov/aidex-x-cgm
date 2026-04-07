@@ -47,15 +47,8 @@ type apiRecord struct {
 // It prefers appCreateTime (which carries an explicit offset) and falls back
 // to appTime + dstOffset.
 func (r apiRecord) parseTime() (time.Time, error) {
-	// Try appCreateTime first – it has an explicit TZ offset.
-	if r.AppCreateTime != "" {
-		t, err := time.Parse("2006-01-02 15:04:05-0700", r.AppCreateTime)
-		if err == nil {
-			return t.UTC(), nil
-		}
-	}
-
-	// Fall back: appTime + location derived from appTimeZone.
+	// 1. Try appTime + location derived from appTimeZone first.
+	// This is the actual measurement time on the device.
 	layout := "2006-01-02 15:04:05"
 	loc := time.UTC
 	if r.AppTimeZone != "" {
@@ -64,10 +57,20 @@ func (r apiRecord) parseTime() (time.Time, error) {
 		}
 	}
 	t, err := time.ParseInLocation(layout, r.AppTime, loc)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("parsing appTime %q: %w", r.AppTime, err)
+	if err == nil {
+		return t.UTC(), nil
 	}
-	return t.UTC(), nil
+
+	// 2. Fall back to appCreateTime – this carries an explicit TZ offset
+	// but often represents the "upload time" to the cloud.
+	if r.AppCreateTime != "" {
+		t, err := time.Parse("2006-01-02 15:04:05-0700", r.AppCreateTime)
+		if err == nil {
+			return t.UTC(), nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("parsing appTime %q and appCreateTime %q", r.AppTime, r.AppCreateTime)
 }
 
 // Client is the AiDEX HTTP adapter implementing domain.CGMFetcher.
