@@ -1,3 +1,5 @@
 .env
 *.pdf
 *.sh
+.DS_Store
+*.json
