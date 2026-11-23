@@ -1,9 +1,9 @@
 import os, hashlib, time, requests
 
-RPP_ID = "da9377c8d40e941b5926b3ded7d1e531"
-URL = f"https://lumiflex.ru{RPP_ID}"
-NS_URL = os.environ["NIGHTSCOUT_URL"].rstrip("/")
-NS_SECRET = hashlib.sha1(os.environ["NIGHTSCOUT_SECRET"].encode()).hexdigest()
+url = "https://lumiflex.ru"
+params = {"rppId": "da9377c8d40e941b5926b3ded7d1e531"}
+ns_url = os.environ["NIGHTSCOUT_URL"].rstrip("/")
+ns_secret = hashlib.sha1(os.environ["NIGHTSCOUT_SECRET"].encode()).hexdigest()
 
 headers = {
     "Accept": "application/json, text/plain, */*",
@@ -13,7 +13,7 @@ headers = {
     "Version": "eu"
 }
 
-resp = requests.get(URL, headers=headers, timeout=15).json()
+resp = requests.get(url, params=params, headers=headers, timeout=15).json()
 print("Lumiflex response:", resp)
 
 data = resp.get("data") or {}
@@ -21,18 +21,17 @@ glucose_mmol = data.get("glucose")
 
 if glucose_mmol:
     sgv = round(float(glucose_mmol) * 18.0182)
-    now_ms = int(time.time() * 1000)
     entry = [{
         "type": "sgv",
         "sgv": sgv,
         "direction": "Flat",
-        "date": now_ms,
+        "date": int(time.time() * 1000),
         "dateString": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
     }]
     r = requests.post(
-        f"{NS_URL}/api/v1/entries",
+        ns_url + "/api/v1/entries",
         json=entry,
-        headers={"API-SECRET": NS_SECRET, "Content-Type": "application/json"},
+        headers={"API-SECRET": ns_secret, "Content-Type": "application/json"},
         timeout=15
     )
     print("Nightscout status:", r.status_code, r.text)
